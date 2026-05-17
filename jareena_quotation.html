@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jareena Printing Press — Quotation</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Serif+Display:ital@0;1&family=Noto+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ─── CSS Custom Properties ─────────────────────────────────────── */
+:root {
+  --blue:     #1a56db;
+  --blue-lt:  #eff4ff;
+  --blue-dk:  #0f3399;
+  --ink:      #0f172a;
+  --muted:    #64748b;
+  --rule:     #e2e8f0;
+  --bg:       #f1f5f9;
+  --white:    #ffffff;
+  --red:      #dc2626;
+
+  /* A4 exact dims */
+  --a4-w: 210mm;
+  --a4-h: 297mm;
+  --doc-pad: 11mm;
+}
+
+/* ─── Reset / Base ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { font-family: 'DM Sans', 'Helvetica Neue', Arial, sans-serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+.arabic { font-family: 'Noto Sans Arabic', 'Arial', sans-serif; }
+
+/* ─── Scrollbar ─────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+/* ─── Input / Textarea Base ─────────────────────────────────────── */
+input, textarea, select {
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+  border: 1.5px solid var(--rule);
+  border-radius: 8px;
+  background: var(--white);
+  color: var(--ink);
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+  padding: 7px 10px;
+}
+input:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,86,219,.12); }
+
+/* ─── Label ─────────────────────────────────────────────────────── */
+label { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+
+/* ─── Section Card ──────────────────────────────────────────────── */
+.card { background: var(--white); border: 1px solid var(--rule); border-radius: 14px; padding: 18px; }
+.card-title { font-size: 9px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; color: #94a3b8; display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.card-title::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--blue); flex-shrink:0; }
+
+/* ─── Buttons ───────────────────────────────────────────────────── */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; border: none; transition: all .15s; -webkit-user-select: none; user-select: none; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--blue); color: #fff; box-shadow: 0 4px 14px rgba(26,86,219,.25); }
+.btn-primary:hover { background: #1447c2; }
+.btn-ghost { background: #f1f5f9; color: var(--ink); }
+.btn-ghost:hover { background: #e2e8f0; }
+.btn-sm { padding: 5px 11px; font-size: 10px; border-radius: 8px; }
+.btn-add { background: #eff4ff; color: var(--blue); font-size: 10px; font-weight: 800; padding: 4px 12px; border-radius: 99px; border: none; cursor: pointer; transition: background .15s; }
+.btn-add:hover { background: #dbeafe; }
+
+/* ─── Sidebar ───────────────────────────────────────────────────── */
+#sidebar { width: 380px; min-width: 340px; max-width: 400px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ─── A4 Document ───────────────────────────────────────────────── */
+#doc {
+  width: var(--a4-w);
+  min-height: var(--a4-h);
+  background: var(--white);
+  padding: var(--doc-pad);
+  /* Pixel-sharp shadow that doesn't bleed into print */
+  box-shadow: 0 8px 40px rgba(0,0,0,.12), 0 2px 8px rgba(0,0,0,.06);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* Prevent subpixel blurring */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 10pt;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+/* ─── Item Editor Card ──────────────────────────────────────────── */
+.item-card {
+  background: #f8fafc;
+  border: 1.5px solid var(--rule);
+  border-radius: 10px;
+  padding: 12px;
+  position: relative;
+  transition: border-color .2s, background .2s;
+}
+.item-card:hover { border-color: #bfdbfe; background: var(--white); }
+.item-remove {
+  position: absolute;
+  top: -8px; right: -8px;
+  width: 22px; height: 22px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity .15s, transform .15s;
+  z-index: 5;
+}
+.item-card:hover .item-remove { opacity: 1; }
+.item-remove:hover { transform: scale(1.15); }
+
+/* ─── Toast ─────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; top: 72px; right: 20px; z-index: 999;
+  background: #1e293b; color: #fff;
+  padding: 10px 18px; border-radius: 12px;
+  font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.2);
+  transform: translateX(calc(100% + 30px));
+  opacity: 0;
+  transition: transform .3s cubic-bezier(.34,1.56,.64,1), opacity .2s;
+  pointer-events: none;
+}
+#toast.show { transform: translateX(0); opacity: 1; }
+#toast-dot { width: 7px; height: 7px; border-radius: 50%; background: #60a5fa; }
+#toast-dot.pulse { animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* ─── Nav ───────────────────────────────────────────────────────── */
+#topnav {
+  background: rgba(255,255,255,.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--rule);
+  position: sticky; top: 0; z-index: 100;
+  height: 60px;
+  display: flex; align-items: center;
+  padding: 0 24px;
+  justify-content: space-between;
+}
+
+/* ─── Document internals ────────────────────────────────────────── */
+#doc-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 4mm; border-bottom: 1px solid #e2e8f0; margin-bottom: 4mm; }
+#doc-meta { display: flex; justify-content: space-between; gap: 5mm; margin-bottom: 4mm; }
+#doc-table { width: 100%; border-collapse: collapse; }
+#doc-table thead tr { border-top: 1.5pt solid var(--ink); border-bottom: 1.5pt solid var(--ink); }
+#doc-table thead th { padding: 3.5pt 0; font-size: 7.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--ink); white-space: nowrap; }
+#doc-table thead th.left { text-align: left; }
+#doc-table thead th.center { text-align: center; }
+#doc-table thead th.right { text-align: right; }
+#doc-table tbody tr { border-bottom: 1px solid #f1f5f9; }
+#doc-table tbody td { padding: 4pt 4pt; vertical-align: top; font-size: 8.5pt; }
+#doc-table tfoot tr { border-top: none; }
+
+/* Page break control — cross-browser. margin-top:auto removed — caused runaway footer on long content */
+#doc-footer {
+  margin-top: 5mm;
+  padding-top: 5mm;
+  border-top: 1.5pt solid var(--ink);
+  page-break-inside: avoid;
+  -webkit-column-break-inside: avoid;
+  break-inside: avoid;
+}
+tr { page-break-inside: avoid; break-inside: avoid; }
+
+/* ─── Print / PDF Styles ─────────────────────────────────────────── */
+@page { size: A4 portrait; margin: 0; }
+
+@media print {
+  .no-print { display: none !important; }
+
+  html {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+  html, body {
+    width: 210mm !important;
+    height: 297mm !important;
+    overflow: hidden !important;     /* hard-stop: nothing bleeds onto page 2 */
+    background: #fff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  #layout {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #main-canvas {
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* transform-origin + scale injected by doPrint() so everything
+     compresses to fit the A4 viewport before the print dialog opens */
+  #doc {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    min-height: unset !important;       /* let scale shrink it freely */
+  }
+  /* Belt-and-suspenders page break prevention */
+  tr, #doc-footer { page-break-inside: avoid !important; break-inside: avoid !important; }
+}
+
+/* ─── Total bubble ───────────────────────────────────────────────── */
+.total-bubble {
+  background: var(--blue);
+  color: #fff;
+  border-radius: 12pt;
+  padding: 10pt 14pt;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ─── Responsive layout wrapper ─────────────────────────────────── */
+#layout { display: flex; gap: 28px; max-width: 1380px; margin: 0 auto; padding: 24px; align-items: flex-start; }
+#main-canvas { flex: 1; overflow-x: auto; padding-bottom: 48px; }
+
+/* ─── Terms border ───────────────────────────────────────────────── */
+.terms-text { border-left: 2pt solid #dbeafe; padding-left: 8pt; font-size: 8pt; color: #475569; line-height: 1.65; white-space: pre-wrap; }
+
+/* Blue meta box */
+.meta-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10pt; padding: 9pt 12pt; }
+
+/* Signature line */
+.sig-line { height: 1px; background: #e2e8f0; margin: 3pt 0 2pt; }
+.sig-name { font-size: 10pt; font-style: italic; font-weight: 600; color: #1e3a8a; min-height: 16pt; }
+.sig-title { font-size: 6.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .12em; color: #94a3b8; }
+.sig-block { text-align: center; width: 36mm; }
+
+/* Amount words */
+#out-words { font-size: 7.5pt; font-weight: 800; text-transform: uppercase; font-style: italic; color: #1e3a8a; text-align: right; margin-top: 6pt; line-height: 1.4; }
+</style>
+</head>
+
+<body>
+
+<!-- ── Toast ───────────────────────────────────────────────────────── -->
+<div id="toast" role="alert" aria-live="polite">
+  <div id="toast-dot"></div>
+  <span id="toast-msg">Processing…</span>
+</div>
+
+<!-- ── Top Navigation ────────────────────────────────────────────── -->
+<nav id="topnav" class="no-print">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:38px;height:38px;background:var(--blue);border-radius:10px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(26,86,219,.3)">
+      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2.2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+      </svg>
+    </div>
+    <div>
+      <div style="font-size:15px;font-weight:800;color:var(--ink);line-height:1.1">Jareena <span style="color:var(--blue)">Press</span></div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94a3b8">Quotation Engine</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn btn-ghost" onclick="doPrint()">
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+      Print
+    </button>
+    <button id="pdf-btn" class="btn btn-primary" onclick="downloadPDF()">
+      <svg id="pdf-icon" width="14" height="14" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      Download PDF
+    </button>
+  </div>
+</nav>
+
+<!-- ── Main Layout ────────────────────────────────────────────────── -->
+<div id="layout">
+
+  <!-- ── SIDEBAR ───────────────────────────────────────────────── -->
+  <aside id="sidebar" class="no-print">
+
+    <!-- Customer -->
+    <div class="card">
+      <div class="card-title">Customer Information</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div><label>Company Name</label><input id="in-name" value="M/s Binladin Contracting Group" oninput="sync()"></div>
+        <div><label>Address</label><input id="in-addr" value="Dubai, UAE" oninput="sync()"></div>
+        <div><label>Attention</label><input id="in-attn" value="Mr. Aji" oninput="sync()"></div>
+      </div>
+    </div>
+
+    <!-- Metadata -->
+    <div class="card">
+      <div class="card-title">Quote Metadata</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <div><label>Quote #</label><input id="in-qno" value="43370" oninput="sync()"></div>
+        <div><label>Date</label><input type="date" id="in-date" value="2026-05-13" oninput="sync()"></div>
+        <div><label>Sales Person</label><input id="in-sales" value="Ravi" oninput="sync()"></div>
+        <div><label>VAT TRN</label><input id="in-trn" value="100390633400003" oninput="sync()"></div>
+      </div>
+    </div>
+
+    <!-- Line Items -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:0;">Line Items</div>
+        <button class="btn-add" onclick="addItem()">+ Add Job</button>
+      </div>
+      <div id="items-wrap" style="display:flex;flex-direction:column;gap:10px;max-height:420px;overflow-y:auto;padding-right:4px;"></div>
+    </div>
+
+    <!-- Footer / Signatures -->
+    <div class="card">
+      <div class="card-title">Footer Settings</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label>Terms &amp; Conditions</label>
+          <textarea id="in-terms" rows="6" oninput="sync()" style="line-height:1.6;resize:vertical;">1. Payment terms: 30 days credit against LPO.
+2. Delivery Timeline: 02 to 3 working days after final confirmation.
+3. Quotation Validity: 2 to 3 Days - Due to the Current Situation.
+4. Prices are based on the quoted quantity. any change in quantity may affect the price
+5. Orders cannot be cancelled once production has started.
+6. Design/sampling charges apply and will be adjusted against the final order.</textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:#f8fafc;border:1px solid var(--rule);border-radius:8px;padding:10px;">
+            <label style="color:#94a3b8;margin-bottom:6px;">Left Signatory</label>
+            <input id="in-s1n" placeholder="Name" oninput="sync()" style="margin-bottom:5px;">
+            <input id="in-s1t" value="CHECKED BY" oninput="sync()">
+          </div>
+          <div style="background:#f8fafc;border:1px solid var(--rule);border-radius:8px;padding:10px;">
+            <label style="color:#94a3b8;margin-bottom:6px;">Right Signatory</label>
+            <input id="in-s2n" value="Devdas" oninput="sync()" style="margin-bottom:5px;">
+            <input id="in-s2t" value="SALES DEPT" oninput="sync()">
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- ── Send Quotation via Email ─────────────────────────── -->
+    <div class="card" id="email-card">
+      <div class="card-title" style="margin-bottom:4px;">
+        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2" style="margin-left:-2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+        &nbsp;Send Quotation by Email
+      </div>
+      <p style="font-size:10px;color:#94a3b8;margin-bottom:12px;line-height:1.5;">Fill recipient details and click Send. The quotation summary will be included automatically.</p>
+
+      <!-- Toggle collapse -->
+      <div id="email-form-wrap">
+        <div style="display:flex;flex-direction:column;gap:8px;">
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div>
+              <label>First Name</label>
+              <input type="text" id="ef-fname" placeholder="Jane">
+            </div>
+            <div>
+              <label>Last Name</label>
+              <input type="text" id="ef-lname" placeholder="Cooper">
+            </div>
+          </div>
+
+          <div>
+            <label>Recipient Email</label>
+            <input type="email" id="ef-email" placeholder="client@company.com">
+          </div>
+
+          <div>
+            <label>Phone (optional)</label>
+            <input type="text" id="ef-phone" placeholder="+971 50 000 0000">
+          </div>
+
+          <div>
+            <label>Service / Enquiry Type</label>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:2px;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#374151;text-transform:none;letter-spacing:0;cursor:pointer;">
+                <input type="radio" name="ef-type" value="Printing" style="width:auto;accent-color:#1a56db;"> Printing
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#374151;text-transform:none;letter-spacing:0;cursor:pointer;">
+                <input type="radio" name="ef-type" value="Design" style="width:auto;accent-color:#1a56db;"> Design
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#374151;text-transform:none;letter-spacing:0;cursor:pointer;">
+                <input type="radio" name="ef-type" value="Quotation" checked style="width:auto;accent-color:#1a56db;"> Quotation
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:#374151;text-transform:none;letter-spacing:0;cursor:pointer;">
+                <input type="radio" name="ef-type" value="Other" style="width:auto;accent-color:#1a56db;"> Other
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label>Message / Notes</label>
+            <textarea id="ef-msg" rows="3" placeholder="Please find attached quotation…" style="resize:vertical;line-height:1.5;"></textarea>
+          </div>
+
+          <!-- Status banner -->
+          <div id="ef-status" style="display:none;padding:8px 12px;border-radius:8px;font-size:11px;font-weight:600;"></div>
+
+          <button onclick="sendEmail()" id="ef-btn"
+            style="width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;transition:background .15s;margin-top:2px;">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+            Send Quotation Email
+          </button>
+          <p style="font-size:9px;color:#cbd5e1;text-align:center;line-height:1.4;">Powered by <strong>send_mail.php</strong> on your server. See setup note below ↓</p>
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ── DOCUMENT CANVAS ──────────────────────────────────────── -->
+  <main id="main-canvas">
+  <div id="doc">
+
+    <!-- ── DOC HEADER ────────────────────────────────────── -->
+    <div id="doc-header">
+
+      <!-- Left: English contact -->
+      <div style="width:30%;font-size:8.5pt;line-height:1.75;color:#475569;">
+        <div style="font-weight:800;font-size:10.5pt;color:var(--ink);margin-bottom:5pt;letter-spacing:-.01em;line-height:1.2;">
+          Jareena Printing Press LLC
+        </div>
+        <div>P.O.Box 32260, Sharjah - UAE</div>
+        <div style="margin-top:3pt;">Tel.&nbsp; 06 565 9485</div>
+        <div>Mob. 050 569 9105</div>
+        <div style="margin-top:5pt;font-size:7.8pt;color:#64748b;line-height:1.65;">
+          <div>info@jareenaprintingpress.com</div>
+          <div>jareenaprintingpresss@gmail.com</div>
+          <div style="color:var(--blue);font-weight:600;">www.jareenaprintingpress.com</div>
+        </div>
+      </div>
+
+      <!-- Center: Logo -->
+      <div style="width:38%;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+        <img id="logo" src="https://www.jareenaprintingpress.com/wp-content/uploads/2025/04/cropped-Jareena-logo-1-2048x585.png"
+             alt="Jareena Printing Press"
+             style="max-height:58pt;max-width:100%;object-fit:contain;"
+             onerror="document.getElementById('logo-fb').style.display='block';this.style.display='none'">
+        <div id="logo-fb" style="display:none;text-align:center;">
+          <div style="font-family:'DM Serif Display',serif;font-size:22pt;color:#1e3a8a;letter-spacing:-.02em;">Jareena</div>
+          <div style="font-size:8pt;font-weight:800;letter-spacing:.2em;color:#94a3b8;text-transform:uppercase;">Printing Press LLC</div>
+        </div>
+      </div>
+
+      <!-- Right: Arabic contact -->
+      <div dir="rtl" class="arabic" style="width:30%;font-size:8.5pt;line-height:1.75;color:#475569;text-align:right;">
+        <div style="font-weight:800;font-size:12pt;color:var(--ink);margin-bottom:5pt;letter-spacing:.01em;line-height:1.2;">
+          مطبعة جرينه ذ.م.م
+        </div>
+        <div>ص.ب 32260، الشارقة - الإمارات</div>
+        <div style="margin-top:3pt;">هاتف: 9485 565 6 06</div>
+        <div>جوال: 9105 569 050</div>
+        <div style="margin-top:5pt;font-size:7.8pt;color:#64748b;line-height:1.65;">
+          <div>info@jareenaprintingpress.com</div>
+          <div>jareenaprintingpresss@gmail.com</div>
+          <div style="color:var(--blue);font-weight:600;">www.jareenaprintingpress.com</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CLIENT + META ──────────────────────────────── -->
+    <div id="doc-meta">
+
+      <!-- Client block -->
+      <div style="width:48%;">
+        <div style="display:inline-block;background:var(--ink);color:#fff;font-size:7pt;font-weight:800;letter-spacing:.14em;text-transform:uppercase;padding:3pt 9pt;border-radius:4pt;margin-bottom:8pt;">Quote For</div>
+        <div id="out-name" style="font-size:14pt;font-weight:800;color:var(--ink);line-height:1.2;margin-bottom:3pt;"></div>
+        <div id="out-addr" style="font-size:9pt;color:var(--muted);font-style:italic;margin-bottom:10pt;"></div>
+        <div style="display:flex;align-items:center;gap:8pt;padding-top:8pt;border-top:1px solid #f1f5f9;">
+          <span style="font-size:7.5pt;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#cbd5e1;">Attention:</span>
+          <span id="out-attn" style="font-size:10pt;font-weight:700;color:var(--ink);"></span>
+        </div>
+      </div>
+
+      <!-- Quote meta box -->
+      <div style="width:48%;" class="meta-box">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10pt;">
+          <div style="font-family:'DM Serif Display',serif;font-size:18pt;font-style:italic;color:var(--ink);letter-spacing:-.02em;">Quotation</div>
+          <div id="out-qno" style="font-size:15pt;font-weight:800;color:var(--red);font-family:monospace;"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5pt;">
+          <div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+            <span style="font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;">Issue Date</span>
+            <span id="out-date" style="font-weight:700;color:var(--ink);"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+            <span style="font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;">VAT TRN</span>
+            <span id="out-trn" style="font-weight:700;color:var(--ink);"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:8.5pt;">
+            <span style="font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.07em;">Representative</span>
+            <span id="out-sales" style="font-weight:700;color:var(--ink);"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── TABLE ──────────────────────────────────────── -->
+    <table id="doc-table">
+      <thead>
+        <tr>
+          <th class="left" style="width:24pt;padding-left:0;">#</th>
+          <th class="left" style="padding-left:6pt;">Description of Goods / Services</th>
+          <th class="center" style="width:48pt;">Qty</th>
+          <th class="right" style="width:48pt;">Rate</th>
+          <th class="right" style="width:58pt;padding-right:0;">Total (AED)</th>
+        </tr>
+      </thead>
+      <tbody id="out-rows"></tbody>
+    </table>
+
+    <!-- ── FOOTER ─────────────────────────────────────── -->
+    <div id="doc-footer">
+      <div style="display:flex;justify-content:space-between;gap:14mm;">
+
+        <!-- Left: Terms + Sigs -->
+        <div style="width:58%;">
+          <div style="font-size:7.5pt;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:6pt;display:flex;align-items:center;gap:4pt;">
+            <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Terms &amp; Conditions
+          </div>
+          <div id="out-terms" class="terms-text"></div>
+
+          <!-- Signatures -->
+          <div style="display:flex;gap:16mm;margin-top:8mm;">
+            <div class="sig-block">
+              <div id="out-s1n" class="sig-name"></div>
+              <div class="sig-line"></div>
+              <div id="out-s1t" class="sig-title"></div>
+            </div>
+            <div class="sig-block">
+              <div id="out-s2n" class="sig-name"></div>
+              <div class="sig-line"></div>
+              <div id="out-s2t" class="sig-title"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Totals -->
+        <div style="width:38%;display:flex;flex-direction:column;gap:4pt;">
+          <div style="display:flex;justify-content:space-between;padding:4pt 6pt;font-size:8.5pt;">
+            <span style="font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">Gross Amount</span>
+            <span id="out-sub" style="font-weight:700;color:var(--ink);">0.00</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4pt 6pt;font-size:8.5pt;border-bottom:1px solid #f1f5f9;padding-bottom:8pt;margin-bottom:2pt;">
+            <span style="font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;">VAT (5%)</span>
+            <span id="out-vat" style="font-weight:700;color:var(--ink);">0.00</span>
+          </div>
+
+          <!-- Total bubble -->
+          <div class="total-bubble force-print" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;padding:8pt 12pt;">
+            <div>
+              <div style="font-size:6.5pt;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.65);margin-bottom:2pt;">Total Due</div>
+              <div style="font-size:8pt;font-weight:600;opacity:.8;font-style:italic;">AED</div>
+            </div>
+            <div id="out-total" style="font-size:18pt;font-weight:800;letter-spacing:-.03em;">0.00</div>
+          </div>
+
+          <div id="out-words"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Brand footer — screen only -->
+    <div class="no-print" style="margin-top:20pt;text-align:center;border-top:1px solid #f1f5f9;padding-top:10pt;">
+      <p style="font-size:7pt;color:#cbd5e1;font-weight:700;letter-spacing:.15em;text-transform:uppercase;">Printed via Jareena Professional Workflow Solutions</p>
+    </div>
+
+  </div><!-- #doc -->
+  </main>
+
+</div><!-- #layout -->
+
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   State
+───────────────────────────────────────────────────────────────── */
+let items = [
+  { id: 1, no: '1.', desc: 'CERTIFICATE\nSize: A4\nMaterial: 300 gsm icegold\nPrinting: 4/0 color print\nFinishing: trim to size\n3 artwork x 5 set', qty: 15, unit: 'Pcs', rate: 10.00, amt: 150.00 }
+];
+
+/* ─── Number → Words ──────────────────────────────────────────── */
+const ONES = ['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+const TENS = ['','','Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+const SCALE = ['','Thousand','Million','Billion'];
+
+function group(n) {
+  let s = '';
+  if (n >= 100) { s += ONES[Math.floor(n/100)] + ' Hundred '; n %= 100; if (n) s += 'and '; }
+  if (n >= 20) { s += TENS[Math.floor(n/10)] + ' '; n %= 10; }
+  if (n > 0) s += ONES[n] + ' ';
+  return s;
+}
+function numWords(n) {
+  if (!n) return 'Zero';
+  let res = '', idx = 0;
+  while (n > 0) {
+    const g = n % 1000;
+    if (g) res = group(g) + (SCALE[idx] ? SCALE[idx] + ' ' : '') + res;
+    n = Math.floor(n / 1000); idx++;
+  }
+  return res.trim();
+}
+
+/* ─── Format date nicely ─────────────────────────────────────── */
+function fmtDate(v) {
+  if (!v) return '';
+  try {
+    // Parse as local date to avoid timezone offset issues
+    const [y, m, d] = v.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+  } catch { return v; }
+}
+
+/* ─── Locale number ──────────────────────────────────────────── */
+const FMT = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+const loc = n => Number(n).toLocaleString('en-US', FMT);
+
+/* ─── Get input value ─────────────────────────────────────────── */
+const g = id => (document.getElementById(id)||{}).value || '';
+
+/* ─── Set text content safely ─────────────────────────────────── */
+const s = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+/* ─── Main sync ──────────────────────────────────────────────── */
+function sync() {
+  // Text fields
+  s('out-name',  g('in-name'));
+  s('out-addr',  g('in-addr'));
+  s('out-attn',  g('in-attn'));
+  s('out-qno',   g('in-qno'));
+  s('out-date',  fmtDate(g('in-date')));
+  s('out-sales', g('in-sales'));
+  s('out-trn',   g('in-trn'));
+  s('out-terms', g('in-terms'));
+  s('out-s1n',   g('in-s1n'));
+  s('out-s1t',   g('in-s1t'));
+  s('out-s2n',   g('in-s2n'));
+  s('out-s2t',   g('in-s2t'));
+
+  // Table
+  const tbody = document.getElementById('out-rows');
+  tbody.innerHTML = '';
+  let sub = 0;
+  items.forEach((item, i) => {
+    const amt = parseFloat(item.amt) || 0;
+    sub += amt;
+    const tr = document.createElement('tr');
+    tr.style.cssText = 'page-break-inside:avoid;break-inside:avoid;';
+    tr.innerHTML = `
+      <td style="font-weight:700;color:#94a3b8;font-size:8.5pt;padding-left:0;padding-right:4pt;">${item.no || (i+1)+'.'}</td>
+      <td style="padding-left:6pt;padding-right:6pt;">
+        <div style="white-space:pre-wrap;font-size:9.5pt;font-weight:500;color:#1e293b;line-height:1.6;">${escHtml(item.desc)}</div>
+      </td>
+      <td style="text-align:center;font-weight:700;font-size:9pt;color:#475569;">
+        ${item.qty} <span style="font-size:7pt;opacity:.5;text-transform:uppercase;">${escHtml(item.unit)}</span>
+      </td>
+      <td style="text-align:right;font-size:9pt;font-weight:500;color:#475569;">${loc(item.rate)}</td>
+      <td style="text-align:right;font-weight:800;font-size:10pt;color:var(--ink);padding-right:0;">${loc(amt)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Totals
+  const vat   = +(sub * 0.05).toFixed(2);
+  const total = +(sub + vat).toFixed(2);
+  s('out-sub', loc(sub));
+  s('out-vat', loc(vat));
+  s('out-total', loc(total));
+
+  // Words
+  const whole = Math.floor(total);
+  const fils  = Math.round((total - whole) * 100);
+  let words = numWords(whole).toUpperCase() + ' DIRHAMS';
+  if (fils > 0) words += ' AND ' + numWords(fils).toUpperCase() + ' FILS';
+  words += ' ONLY.';
+  s('out-words', words);
+}
+
+function escHtml(t) {
+  return (t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ─── Item editor render ─────────────────────────────────────── */
+function renderEditors() {
+  const wrap = document.getElementById('items-wrap');
+  wrap.innerHTML = '';
+  items.forEach(item => {
+    const d = document.createElement('div');
+    d.className = 'item-card';
+    d.innerHTML = `
+      <button class="item-remove" onclick="removeItem(${item.id})" title="Remove">✕</button>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <div style="width:40px;flex-shrink:0;">
+          <label>No.</label>
+          <input value="${escAttr(item.no)}" oninput="updateItem(${item.id},'no',this.value)" style="text-align:center;font-weight:800;padding:6px 4px;">
+        </div>
+        <div style="flex:1;">
+          <label>Description</label>
+          <textarea oninput="updateItem(${item.id},'desc',this.value)" style="min-height:56px;line-height:1.5;resize:vertical;">${escHtml(item.desc)}</textarea>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px;">
+        <div><label>Qty</label><input type="number" step="any" value="${item.qty}" oninput="updateItem(${item.id},'qty',this.value)" style="font-weight:700;"></div>
+        <div><label>Unit</label><input value="${escAttr(item.unit)}" oninput="updateItem(${item.id},'unit',this.value)"></div>
+        <div><label>Rate</label><input type="number" step="any" value="${item.rate}" oninput="updateItem(${item.id},'rate',this.value)" style="font-weight:700;"></div>
+        <div><label style="color:var(--blue);">Total</label><input id="a-${item.id}" type="number" step="any" value="${item.amt}" oninput="updateItem(${item.id},'amt',this.value,true)" style="background:#eff6ff;border-color:#bfdbfe;color:var(--blue);font-weight:800;"></div>
+      </div>
+    `;
+    wrap.appendChild(d);
+  });
+}
+
+function escAttr(t) { return (t||'').replace(/"/g,'&quot;'); }
+
+function addItem() {
+  items.push({ id: Date.now(), no: (items.length+1)+'.', desc: '', qty: 1, unit: 'Pcs', rate: 0, amt: 0 });
+  renderEditors(); sync();
+}
+
+function removeItem(id) {
+  items = items.filter(i => i.id !== id);
+  renderEditors(); sync();
+}
+
+function updateItem(id, field, val, manual = false) {
+  items = items.map(i => {
+    if (i.id !== id) return i;
+    const upd = { ...i, [field]: val };
+    if (!manual && (field === 'qty' || field === 'rate')) {
+      upd.amt = +((+upd.qty || 0) * (+upd.rate || 0)).toFixed(2);
+      const el = document.getElementById('a-'+id);
+      if (el) el.value = upd.amt;
+    }
+    return upd;
+  });
+  sync();
+}
+
+/* ─── Toast ──────────────────────────────────────────────────── */
+let toastTimer;
+function toast(msg, sticky = false) {
+  const t = document.getElementById('toast');
+  const dot = document.getElementById('toast-dot');
+  document.getElementById('toast-msg').textContent = msg;
+  dot.className = sticky ? 'pulse' : '';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  if (!sticky) toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+/* ─── Print — scale #doc to fit exactly one A4 page ─────────────── */
+function doPrint() {
+  const doc  = document.getElementById('doc');
+  const wrap = document.getElementById('main-canvas');
+
+  // Reset any previous scale first so measurements are accurate
+  doc.style.transform       = '';
+  doc.style.transformOrigin = '';
+  doc.style.marginBottom    = '';
+
+  // Physical A4 in CSS pixels at 96 dpi
+  const A4_W = 210 * (96 / 25.4);   // ≈ 793 px
+  const A4_H = 297 * (96 / 25.4);   // ≈ 1122 px
+
+  const docW = doc.scrollWidth;
+  const docH = doc.scrollHeight;
+
+  const scale = Math.min(A4_W / docW, A4_H / docH, 1);
+
+  if (scale < 1) {
+    doc.style.transformOrigin = 'top left';
+    doc.style.transform       = `scale(${scale})`;
+    // Collapse the dead space the scaled element would leave
+    doc.style.marginBottom    = `-${docH * (1 - scale)}px`;
+  }
+
+  window.scrollTo(0, 0);
+
+  // Give the browser one frame to apply the transform, then print
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      window.print();
+      // Restore original layout once the print dialog is dismissed
+      setTimeout(() => {
+        doc.style.transform       = '';
+        doc.style.transformOrigin = '';
+        doc.style.marginBottom    = '';
+      }, 800);
+    }, 120);
+  });
+}
+
+/* ─── PDF — guaranteed single page: canvas → jsPDF ─────────────── */
+async function downloadPDF() {
+  const btn = document.getElementById('pdf-btn');
+  btn.disabled = true;
+  toast('Generating PDF…', true);
+
+  try {
+    window.scrollTo(0, 0);
+
+    const el  = document.getElementById('doc');
+    const qno = g('in-qno') || 'Draft';
+
+    // ① Render the full element to a canvas
+    const canvas = await html2canvas(el, {
+      scale          : 2.5,          // 2.5× for crisp text
+      useCORS        : true,
+      allowTaint     : true,
+      logging        : false,
+      backgroundColor: '#ffffff',
+      scrollX        : 0,
+      scrollY        : 0,
+      windowWidth    : el.scrollWidth,
+      windowHeight   : el.scrollHeight
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    // ② Create a single-page A4 PDF
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+
+    const PAGE_W = 210, PAGE_H = 297;
+    const ratio  = canvas.height / canvas.width;   // canvas aspect
+
+    // Fit to full width; if height exceeds page, scale down uniformly
+    let imgW = PAGE_W;
+    let imgH = PAGE_W * ratio;
+
+    if (imgH > PAGE_H) {
+      const shrink = PAGE_H / imgH;
+      imgW *= shrink;
+      imgH  = PAGE_H;
+    }
+
+    // Centre horizontally (imgW may be < PAGE_W if very tall)
+    const x = (PAGE_W - imgW) / 2;
+
+    pdf.addImage(imgData, 'JPEG', x, 0, imgW, imgH);
+    pdf.save(`Jareena_Quotation_${qno}.pdf`);
+
+    hideToast();
+    toast('PDF saved ✓');
+  } catch (err) {
+    console.error('PDF error:', err);
+    toast('PDF failed — using print fallback');
+    doPrint();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ─── Send Quotation Email ───────────────────────────────────── */
+function sendEmail() {
+  const btn    = document.getElementById('ef-btn');
+  const status = document.getElementById('ef-status');
+
+  const fname  = document.getElementById('ef-fname').value.trim();
+  const lname  = document.getElementById('ef-lname').value.trim();
+  const email  = document.getElementById('ef-email').value.trim();
+  const phone  = document.getElementById('ef-phone').value.trim();
+  const msg    = document.getElementById('ef-msg').value.trim();
+  const type   = (document.querySelector('input[name="ef-type"]:checked') || {}).value || 'Quotation';
+
+  // Validation
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showStatus('⚠ Please enter a valid recipient email address.', 'warn'); return;
+  }
+
+  // Build quotation summary from current doc state
+  const qno    = document.getElementById('in-qno').value;
+  const qdate  = document.getElementById('in-date').value;
+  const client = document.getElementById('in-name').value;
+  const total  = document.getElementById('out-total').textContent;
+  const words  = document.getElementById('out-words').textContent;
+
+  const body = [
+    `Dear ${fname} ${lname},`,
+    ``,
+    `Please find below the quotation details from Jareena Printing Press LLC.`,
+    ``,
+    `━━━ QUOTATION SUMMARY ━━━`,
+    `Quote No   : ${qno}`,
+    `Date       : ${qdate}`,
+    `Client     : ${client}`,
+    `Service    : ${type}`,
+    `Total (AED): ${total}`,
+    `In Words   : ${words}`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    msg ? `Note: ${msg}` : '',
+    ``,
+    `For queries, please contact us:`,
+    `Tel: 06 565 9485  |  Mob: 050 569 9105`,
+    `info@jareenaprintingpress.com`,
+    `www.jareenaprintingpress.com`,
+    ``,
+    `Regards,`,
+    `Jareena Printing Press LLC`,
+    `Sharjah - UAE`
+  ].filter(l => l !== undefined).join('\n');
+
+  // Disable button, show loading
+  btn.disabled = true;
+  btn.innerHTML = '<span style="opacity:.6">Sending…</span>';
+  showStatus('⏳ Sending email, please wait…', 'info');
+
+  // POST to send_mail.php on your server
+  fetch('send_mail.php', {
+    method : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body   : JSON.stringify({ fname, lname, email, phone, type, body, qno })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showStatus('✅ Email sent successfully to ' + email, 'ok');
+      // Clear form
+      ['ef-fname','ef-fname','ef-lname','ef-email','ef-phone','ef-msg'].forEach(id => {
+        const el = document.getElementById(id); if(el) el.value = '';
+      });
+    } else {
+      showStatus('❌ Server error: ' + (data.message || 'Unknown error'), 'err');
+    }
+  })
+  .catch(() => {
+    // Fallback: open default mail client with pre-filled content
+    showStatus('⚠ Server unreachable — opening your mail client as fallback.', 'warn');
+    const subject = encodeURIComponent(`Quotation #${qno} – Jareena Printing Press LLC`);
+    const bodyEnc = encodeURIComponent(body);
+    window.location.href = `mailto:${email}?subject=${subject}&body=${bodyEnc}`;
+  })
+  .finally(() => {
+    btn.disabled = false;
+    btn.innerHTML = `<svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg> Send Quotation Email`;
+  });
+}
+
+function showStatus(msg, type) {
+  const el = document.getElementById('ef-status');
+  el.style.display = 'block';
+  el.textContent   = msg;
+  const colors = {
+    ok  : { bg:'#f0fdf4', color:'#15803d', border:'#bbf7d0' },
+    err : { bg:'#fff1f2', color:'#b91c1c', border:'#fecdd3' },
+    warn: { bg:'#fffbeb', color:'#92400e', border:'#fde68a' },
+    info: { bg:'#eff6ff', color:'#1d4ed8', border:'#bfdbfe' },
+  };
+  const c = colors[type] || colors.info;
+  el.style.background   = c.bg;
+  el.style.color        = c.color;
+  el.style.border       = `1px solid ${c.border}`;
+  el.style.borderRadius = '8px';
+}
+window.addEventListener('DOMContentLoaded', () => {
+  renderEditors();
+  sync();
+});
+</script>
+</body>
+</html>
